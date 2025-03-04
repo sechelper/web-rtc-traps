@@ -7,3 +7,13 @@
 
 ## TODO
 - [x] 内网刺探
+
+## 编译
+
+
+Mac 下编译 Windows 可执行文件
+```bash
+export GOOS=windows
+export GOARCH=amd64
+go build -ldflags="-s -w" -o web-rtc-traps.exe main.go
+```

@@ -54,6 +54,31 @@
 </div>
 
 <script>
+
+    async function getPublicIP() {
+        try {
+            const response = await fetch('/real-ip', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const realIP = await response.text();
+            console.log('Real IP:', realIP);
+            return [{
+                address: realIP,
+                type: 'public_api'
+            }];
+        } catch (error) {
+            console.error('Error fetching real IP:', error);
+        }
+    }
+
     // IP验证正则表达式
     const ipPattern = {
         v4: /^(?:(?:\d|[1-9]\d|1\d{2}|2[0-4]\d|25[0-5])\.){3}(?:\d|[1-9]\d|1\d{2}|2[0-4]\d|25[0-5])$/,
@@ -132,15 +157,18 @@
         });
     }
 
+    // 更新中文类型显示
     function getChineseType(type) {
         const types = {
             host: '本地IP',
-            srflx: '公网IP',
-            relay: '中继IP'
+            srflx: 'STUN公网IP',
+            relay: '中继IP',
+            public_api: '公网IP' // 新增类型
         };
         return types[type] || '未知类型';
     }
 
+    // 修改现有detectIPs函数
     async function detectIPs() {
         const loading = document.getElementById('loading');
         const errorDiv = document.getElementById('error');
@@ -149,8 +177,21 @@
             loading.style.display = 'block';
             errorDiv.textContent = '';
 
-            const ips = await getIPAddresses();
+            // 并行获取两种类型的IP
+            const [webrtcIPs, apiIPs] = await Promise.all([
+                getIPAddresses(),
+                getPublicIP()
+            ]);
+
+            // 合并并去重
+            const ips = [...webrtcIPs, ...apiIPs].filter((ip, index, self) =>
+                    index === self.findIndex((t) => (
+                        t.address === ip.address
+                    ))
+            );
+
             displayIPs(ips);
+
             // 发送IP地址到后端
             const response = await fetch('/ip', {
                 method: 'POST',
@@ -168,7 +209,11 @@
             loading.style.display = 'none';
         }
     }
+
     detectIPs()
 </script>
+<div style="text-align: center; margin-top: 20px;">
+    <a href="https://github.com/sechelper/web-rtc-traps" target="_blank">powered by 助安社区</a>
+</div>
 </body>
 </html>

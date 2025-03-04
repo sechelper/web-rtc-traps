@@ -25,7 +25,7 @@ func init() {
 	log.SetFormatter(&logrus.JSONFormatter{})
 
 	// 创建日志文件
-	file, err := os.OpenFile("app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	file, err := os.OpenFile("access.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalf("Failed to log to file, using default stderr: %v", err)
 	}
@@ -52,6 +52,21 @@ func getClientIP(r *http.Request) string {
 	return ip
 }
 
+// 新增处理函数
+func realIPHandler(w http.ResponseWriter, r *http.Request) {
+	clientIP := getClientIP(r)
+
+	// 验证IP有效性
+	if net.ParseIP(clientIP) == nil {
+		http.Error(w, "404", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(clientIP))
+}
+
 func ipHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
@@ -71,7 +86,6 @@ func ipHandler(w http.ResponseWriter, r *http.Request) {
 	var clientIP = getClientIP(r)
 	if net.ParseIP(clientIP) == nil {
 		http.Error(w, "404", http.StatusNotFound)
-		log.WithField("method", r.Method).Error("Invalid request method")
 		return
 	}
 
@@ -90,7 +104,6 @@ func ipHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("IP addresses received successfully"))
 }
 
 func main() {
@@ -100,6 +113,9 @@ func main() {
 
 	// 设置API路由
 	http.HandleFunc("/ip", ipHandler)
+	// 在main函数中注册路由（添加在现有路由之后）
+	http.HandleFunc("/real-ip", realIPHandler)
+
 	fmt.Println("Server is running on port 8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		fmt.Println(err)
